@@ -169,6 +169,21 @@
     <string name="are_you_sure_you_want_to_turn_on_anti_uninstall_there_is_no_turning_back">ARE YOU SURE YOU WANT TO TURN ON ANTI UNINSTALL? There is no turning back...</string>
     <string name="about_view_blocker">About View Blocker</string>
     <string name="this_option_has_the_ability_to_block_youtube_shorts_and_instagram_reels_while_allowing_access_to_other_app_features">This option has the ability to block YouTube Shorts and Instagram Reels while allowing access to other app features.</string>
+
+    <string name="about_app_blocker">About App Blocker</string>
+    <string name="about_app_blocker_desc">Blocks selected apps using Accessibility. Configure blocked apps, warning screen, and cheat hours once enabled.</string>
+
+    <string name="about_focus_mode">About Focus Mode</string>
+    <string name="about_focus_mode_desc">Temporarily blocks distractions for a set time. Uses App Blocker’s Accessibility service and your selected mode (block all except selected, or block selected only).</string>
+
+    <string name="about_keyword_blocker">About Keyword Blocker</string>
+    <string name="about_keyword_blocker_desc">Blocks content based on keywords. Add custom keywords, manage packs, and configure how blocking works once enabled.</string>
+
+    <string name="about_usage_tracker">About Usage Tracker</string>
+    <string name="about_usage_tracker_desc">Tracks usage stats like reels/shorts scrolling and can show an overlay. Requires Accessibility + “Display over other apps” permission.</string>
+
+    <string name="about_anti_uninstall">About Anti-Uninstall</string>
+    <string name="about_anti_uninstall_desc">Prevents uninstall attempts until you remove protection. Requires Device Admin and the General Features Accessibility service.</string>
     <string name="configure_blocker">Configure Blocker</string>
     <string name="select_apps">Select Apps</string>
     <string name="setup_auto_focus">Setup Auto-Focus</string>

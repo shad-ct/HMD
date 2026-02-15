@@ -16,6 +16,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.widget.CompoundButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -31,14 +32,15 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nethical.digipaws.Constants
 import nethical.digipaws.R
+import nethical.digipaws.blockers.FocusModeBlocker
 import nethical.digipaws.databinding.ActivityMainBinding
 import nethical.digipaws.databinding.DialogPermissionInfoBinding
 import nethical.digipaws.databinding.DialogRemoveAntiUninstallBinding
@@ -86,8 +88,27 @@ class MainActivity : AppCompatActivity() {
     private var isDeviceAdminOn = false
     private var isAntiUninstallOn = false
 
+    private var isUpdatingModuleToggles = false
+    private var isAppBlockerServiceEnabled = false
+    private var isViewBlockerServiceEnabled = false
+    private var isKeywordBlockerServiceEnabled = false
+    private var isUsageTrackerServiceEnabled = false
+
     private var isGeneralSettingsOn = false
     private var isDisplayOverOtherAppsOn = false
+
+    private var appBlockerExpanded = false
+    private var focusModeExpanded = false
+    private var viewBlockerExpanded = false
+    private var keywordBlockerExpanded = false
+    private var usageTrackerExpanded = false
+    private var antiUninstallExpanded = false
+
+    private var lastAppBlockerEnabled = false
+    private var lastViewBlockerEnabled = false
+    private var lastKeywordBlockerEnabled = false
+    private var lastUsageTrackerReady = false
+    private var lastAntiUninstallEnabled = false
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -330,41 +351,83 @@ class MainActivity : AppCompatActivity() {
 
         }
 
-        // listeners for turn on/ off buttons
-        binding.antiUninstallCardChip.setOnClickListener {
-            if (!isDeviceAdminOn) {
-                makeDeviceAdminPermissionDialog()
-            } else {
-                if (binding.antiUninstallWarning.visibility == View.GONE) {
-                    val intent = Intent(this, FragmentActivity::class.java)
-                    intent.putExtra("fragment", ChooseModeFragment.FRAGMENT_ID)
-                    startActivity(intent, options.toBundle())
-                } else {
-                    makeAccessibilityInfoDialog(
-                        "General Features",
-                        GeneralFeaturesService::class.java
-                    )
-                }
-            }
+        // module toggles
+        binding.appBlockerStatusChip.setOnCheckedChangeListener { toggle, _ ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
+            makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
+            resetToggle(toggle, isAppBlockerServiceEnabled)
         }
 
-        binding.keywordBlockerStatusChip.setOnClickListener {
-            makeAccessibilityInfoDialog("Keyword Blocker", KeywordBlockerService::class.java)
-        }
-        binding.focusModeStatusChip.setOnClickListener {
-            makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
-        }
-        binding.appBlockerStatusChip.setOnClickListener {
-            makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
-        }
-        binding.viewBlockerStatusChip.setOnClickListener {
+        binding.viewBlockerStatusChip.setOnCheckedChangeListener { toggle, _ ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
             makeAccessibilityInfoDialog("View Blocker", ViewBlockerService::class.java)
+            resetToggle(toggle, isViewBlockerServiceEnabled)
         }
-        binding.usageTrackerStatusChip.setOnClickListener {
+
+        binding.keywordBlockerStatusChip.setOnCheckedChangeListener { toggle, _ ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
+            makeAccessibilityInfoDialog("Keyword Blocker", KeywordBlockerService::class.java)
+            resetToggle(toggle, isKeywordBlockerServiceEnabled)
+        }
+
+        binding.usageTrackerStatusChip.setOnCheckedChangeListener { toggle, _ ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
             if (!isDisplayOverOtherAppsOn) {
                 makeDrawOverOtherAppsDialog()
             } else {
                 makeAccessibilityInfoDialog("Usage Tracker", UsageTrackingService::class.java)
+            }
+            resetToggle(toggle, isUsageTrackerServiceEnabled && isDisplayOverOtherAppsOn)
+        }
+
+        binding.antiUninstallCardChip.setOnCheckedChangeListener { toggle, isChecked ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
+            if (isChecked) {
+                if (!isDeviceAdminOn) {
+                    makeDeviceAdminPermissionDialog()
+                } else if (!isGeneralSettingsOn) {
+                    makeAccessibilityInfoDialog("General Features", GeneralFeaturesService::class.java)
+                } else if (!isAntiUninstallOn) {
+                    val intent = Intent(this, FragmentActivity::class.java)
+                    intent.putExtra("fragment", ChooseModeFragment.FRAGMENT_ID)
+                    startActivity(intent, options.toBundle())
+                }
+            } else {
+                if (isAntiUninstallOn) {
+                    makeRemoveAntiUninstallDialog()
+                }
+            }
+            resetToggle(toggle, isAntiUninstallOn)
+        }
+
+        binding.focusModeStatusChip.setOnCheckedChangeListener { toggle, isChecked ->
+            if (isUpdatingModuleToggles) return@setOnCheckedChangeListener
+
+            if (!isAppBlockerServiceEnabled) {
+                makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
+                resetToggle(toggle, false)
+                return@setOnCheckedChangeListener
+            }
+
+            if (isChecked) {
+                StartFocusMode(savedPreferencesLoader, onPositiveButtonPressed = {
+                    isUpdatingModuleToggles = true
+                    binding.focusModeStatusChip.isChecked = true
+                    isUpdatingModuleToggles = false
+                    binding.selectFocusBlockedApps.isEnabled = false
+                    binding.startFocusMode.isEnabled = false
+                }).show(supportFragmentManager, "start_focus_mode_toggle")
+            } else {
+                val previous = savedPreferencesLoader.getFocusModeData()
+                savedPreferencesLoader.saveFocusModeData(
+                    FocusModeBlocker.FocusModeData(
+                        isTurnedOn = false,
+                        endTime = -1,
+                        modeType = previous.modeType,
+                        selectedApps = previous.selectedApps
+                    )
+                )
+                sendRefreshRequest(AppBlockerService.INTENT_ACTION_REFRESH_FOCUS_MODE)
             }
         }
 
@@ -375,19 +438,125 @@ class MainActivity : AppCompatActivity() {
                 .setPositiveButton(getString(R.string.ok), null)
                 .show()
         }
+
+        binding.helpAppBlocker.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.about_app_blocker))
+                .setMessage(getString(R.string.about_app_blocker_desc))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        }
+
+        binding.helpFocusMode.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.about_focus_mode))
+                .setMessage(getString(R.string.about_focus_mode_desc))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        }
+
+        binding.helpKeywordBlocker.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.about_keyword_blocker))
+                .setMessage(getString(R.string.about_keyword_blocker_desc))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        }
+
+        binding.helpUsageTracker.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.about_usage_tracker))
+                .setMessage(getString(R.string.about_usage_tracker_desc))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        }
+
+        binding.helpAntiUninstall.setOnClickListener {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.about_anti_uninstall))
+                .setMessage(getString(R.string.about_anti_uninstall_desc))
+                .setPositiveButton(getString(R.string.ok), null)
+                .show()
+        }
+
+        // Expand/collapse module action sections
+        binding.appBlockerHeader.setOnClickListener {
+            if (isAppBlockerServiceEnabled) {
+                appBlockerExpanded = !appBlockerExpanded
+                binding.appBlockerActions.visibility = if (appBlockerExpanded) View.VISIBLE else View.GONE
+            } else {
+                makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
+            }
+        }
+
+        binding.focusModeHeader.setOnClickListener {
+            if (isAppBlockerServiceEnabled) {
+                focusModeExpanded = !focusModeExpanded
+                binding.focusModeActions.visibility = if (focusModeExpanded) View.VISIBLE else View.GONE
+            } else {
+                makeAccessibilityInfoDialog("App Blocker", AppBlockerService::class.java)
+            }
+        }
+
+        binding.viewBlockerHeader.setOnClickListener {
+            if (isViewBlockerServiceEnabled) {
+                viewBlockerExpanded = !viewBlockerExpanded
+                binding.viewBlockerActions.visibility = if (viewBlockerExpanded) View.VISIBLE else View.GONE
+            } else {
+                makeAccessibilityInfoDialog("View Blocker", ViewBlockerService::class.java)
+            }
+        }
+
+        binding.keywordBlockerHeader.setOnClickListener {
+            if (isKeywordBlockerServiceEnabled) {
+                keywordBlockerExpanded = !keywordBlockerExpanded
+                binding.keywordBlockerActions.visibility = if (keywordBlockerExpanded) View.VISIBLE else View.GONE
+            } else {
+                makeAccessibilityInfoDialog("Keyword Blocker", KeywordBlockerService::class.java)
+            }
+        }
+
+        binding.usageTrackerHeader.setOnClickListener {
+            if (!isDisplayOverOtherAppsOn) {
+                makeDrawOverOtherAppsDialog()
+                return@setOnClickListener
+            }
+
+            if (isUsageTrackerServiceEnabled) {
+                usageTrackerExpanded = !usageTrackerExpanded
+                binding.usageTrackerActions.visibility = if (usageTrackerExpanded) View.VISIBLE else View.GONE
+            } else {
+                makeAccessibilityInfoDialog("Usage Tracker", UsageTrackingService::class.java)
+            }
+        }
+
+        binding.antiUninstallHeader.setOnClickListener {
+            if (isAntiUninstallOn) {
+                antiUninstallExpanded = !antiUninstallExpanded
+                binding.antiUninstallActions.visibility = if (antiUninstallExpanded) View.VISIBLE else View.GONE
+            } else if (!isDeviceAdminOn) {
+                makeDeviceAdminPermissionDialog()
+            } else if (!isGeneralSettingsOn) {
+                makeAccessibilityInfoDialog("General Features", GeneralFeaturesService::class.java)
+            } else {
+                val intent = Intent(this, FragmentActivity::class.java)
+                intent.putExtra("fragment", ChooseModeFragment.FRAGMENT_ID)
+                startActivity(intent, options.toBundle())
+            }
+        }
     }
 
     private fun checkPermissions() {
 
         isDisplayOverOtherAppsOn = Settings.canDrawOverlays(this)
         lifecycleScope.launch {
-            val isAppBlockerOn =
+            isAppBlockerServiceEnabled =
                 withContext(Dispatchers.IO) { isAccessibilityServiceEnabled(AppBlockerService::class.java) }
-            val isViewBlockerOn =
+            isViewBlockerServiceEnabled =
                 withContext(Dispatchers.IO) { isAccessibilityServiceEnabled(ViewBlockerService::class.java) }
-            val isKeywordBlockerOn =
+            isKeywordBlockerServiceEnabled =
                 withContext(Dispatchers.IO) { isAccessibilityServiceEnabled(KeywordBlockerService::class.java) }
-            val isUsageTrackerOn =
+            isUsageTrackerServiceEnabled =
                 withContext(Dispatchers.IO) { isAccessibilityServiceEnabled(UsageTrackingService::class.java) }
             isGeneralSettingsOn =
                 withContext(Dispatchers.IO) { isAccessibilityServiceEnabled(GeneralFeaturesService::class.java) }
@@ -405,87 +574,94 @@ class MainActivity : AppCompatActivity() {
                 antiUninstallInfo.getBoolean("is_configuring_blocked", false)
 
             withContext(Dispatchers.Main) {
+                val usageTrackerReady = isUsageTrackerServiceEnabled && isDisplayOverOtherAppsOn
+
+                if (isAppBlockerServiceEnabled && !lastAppBlockerEnabled) {
+                    appBlockerExpanded = true
+                    focusModeExpanded = true
+                }
+                if (isViewBlockerServiceEnabled && !lastViewBlockerEnabled) viewBlockerExpanded = true
+                if (isKeywordBlockerServiceEnabled && !lastKeywordBlockerEnabled) keywordBlockerExpanded = true
+                if (usageTrackerReady && !lastUsageTrackerReady) usageTrackerExpanded = true
+                if (isAntiUninstallOn && !lastAntiUninstallEnabled) antiUninstallExpanded = true
+
+                if (!isAppBlockerServiceEnabled) {
+                    appBlockerExpanded = false
+                    focusModeExpanded = false
+                }
+                if (!isViewBlockerServiceEnabled) viewBlockerExpanded = false
+                if (!isKeywordBlockerServiceEnabled) keywordBlockerExpanded = false
+                if (!usageTrackerReady) usageTrackerExpanded = false
+                if (!isAntiUninstallOn) antiUninstallExpanded = false
+
                 // App Blocker
-                updateChip(isAppBlockerOn, binding.appBlockerStatusChip, binding.appBlockerWarning)
+                updateModuleToggle(isAppBlockerServiceEnabled, binding.appBlockerStatusChip, binding.appBlockerWarning)
+                binding.appBlockerActions.visibility = if (isAppBlockerServiceEnabled && appBlockerExpanded) View.VISIBLE else View.GONE
                 binding.apply {
-                    selectBlockedApps.isEnabled = isAppBlockerOn
-                    btnConfigAppblockerWarning.isEnabled = isAppBlockerOn
-                    appBlockerSelectCheatHours.isEnabled = isAppBlockerOn
+                    selectBlockedApps.isEnabled = isAppBlockerServiceEnabled
+                    btnConfigAppblockerWarning.isEnabled = isAppBlockerServiceEnabled
+                    appBlockerSelectCheatHours.isEnabled = isAppBlockerServiceEnabled
                 }
 
                 // View Blocker
-                updateChip(
-                    isViewBlockerOn, binding.viewBlockerStatusChip, binding.viewBlockerWarning
-                )
+                updateModuleToggle(isViewBlockerServiceEnabled, binding.viewBlockerStatusChip, binding.viewBlockerWarning)
+                binding.viewBlockerActions.visibility = if (isViewBlockerServiceEnabled && viewBlockerExpanded) View.VISIBLE else View.GONE
                 binding.apply {
-                    btnConfigViewblockerCheatHours.isEnabled = isViewBlockerOn
-                    btnConfigViewblockerWarning.isEnabled = isViewBlockerOn
+                    btnConfigViewblockerCheatHours.isEnabled = isViewBlockerServiceEnabled
+                    btnConfigViewblockerWarning.isEnabled = isViewBlockerServiceEnabled
                 }
 
                 // Keyword Blocker
-                updateChip(
-                    isKeywordBlockerOn,
-                    binding.keywordBlockerStatusChip,
-                    binding.keywordBlockerWarning
-                )
+                updateModuleToggle(isKeywordBlockerServiceEnabled, binding.keywordBlockerStatusChip, binding.keywordBlockerWarning)
+                binding.keywordBlockerActions.visibility = if (isKeywordBlockerServiceEnabled && keywordBlockerExpanded) View.VISIBLE else View.GONE
                 binding.apply {
-                    selectBlockedKeywords.isEnabled = isKeywordBlockerOn
-                    btnManagePreinstalledKeywords.isEnabled = isKeywordBlockerOn
-                    btnManageKeywordBlocker.isEnabled = isKeywordBlockerOn
+                    selectBlockedKeywords.isEnabled = isKeywordBlockerServiceEnabled
+                    btnManagePreinstalledKeywords.isEnabled = isKeywordBlockerServiceEnabled
+                    btnManageKeywordBlocker.isEnabled = isKeywordBlockerServiceEnabled
                 }
 
                 // Usage Tracker
-                if (!isDisplayOverOtherAppsOn) {
-                    binding.usageTrackerWarning.text =
-                        getString(R.string.please_provide_display_over_other_apps_permission_to_access_this_feature)
-                } else if (!isGeneralSettingsOn) {
-                    binding.usageTrackerWarning.text =
-                        getString(R.string.warning_usage_tracker_settings)
-                }
-                if (isUsageTrackerOn && isDisplayOverOtherAppsOn) {
-                    updateChip(
-                        true,
-                        binding.usageTrackerStatusChip,
-                        binding.usageTrackerWarning
-                    )
+                updateModuleToggle(
+                    usageTrackerReady,
+                    binding.usageTrackerStatusChip,
+                    binding.usageTrackerWarning
+                )
+                binding.usageTrackerActions.visibility =
+                    if (usageTrackerReady && usageTrackerExpanded) View.VISIBLE else View.GONE
+                if (usageTrackerReady) {
                     binding.apply {
                         selectReelUsageStats.isEnabled = true
                         btnSelectAppsToShowOverlay.isEnabled = true
                         btnConfigTracker.isEnabled = true
                     }
+                } else {
+                    binding.apply {
+                        selectReelUsageStats.isEnabled = false
+                        btnSelectAppsToShowOverlay.isEnabled = false
+                        btnConfigTracker.isEnabled = false
+                    }
                 }
 
 
                 // General Settings
-                updateChip(
-                    isAppBlockerOn,
-                    binding.focusModeStatusChip,
-                    binding.focusModeWarning
-                )
+                val isFocusedModeOn = if (isAppBlockerServiceEnabled) savedPreferencesLoader.getFocusModeData().isTurnedOn else false
+                updateModuleToggle(isFocusedModeOn, binding.focusModeStatusChip, binding.focusModeWarning)
+                binding.focusModeActions.visibility = if (isAppBlockerServiceEnabled && focusModeExpanded) View.VISIBLE else View.GONE
                 binding.apply {
-                    startFocusMode.isEnabled = isAppBlockerOn
-                    selectFocusBlockedApps.isEnabled = isAppBlockerOn
-                    autoFocus.isEnabled = isAppBlockerOn
+                    startFocusMode.isEnabled = isAppBlockerServiceEnabled
+                    selectFocusBlockedApps.isEnabled = isAppBlockerServiceEnabled
+                    autoFocus.isEnabled = isAppBlockerServiceEnabled
                 }
 
                 // Anti-Uninstall settings
                 binding.btnUnlockAntiUninstall.isEnabled = isAntiUninstallOn
-
-                // Update Anti-Uninstall warning
-                if (!isDeviceAdminOn) {
-                    binding.antiUninstallWarning.text =
-                        getString(R.string.please_enable_device_admin)
-                } else if (!isGeneralSettingsOn) {
-                    binding.antiUninstallWarning.text = getString(R.string.warning_general_settings)
-                }
+                binding.antiUninstallActions.visibility = if (isAntiUninstallOn && antiUninstallExpanded) View.VISIBLE else View.GONE
 
                 // Handle anti-uninstall UI changes
-                if (isDeviceAdminOn && isGeneralSettingsOn) {
-                    updateChip(true, binding.antiUninstallCardChip, binding.antiUninstallWarning)
-                    binding.antiUninstallCardChip.isEnabled = !isAntiUninstallOn
-                    binding.antiUninstallCardChip.text =
-                        if (isAntiUninstallOn) getString(R.string.setup_complete) else getString(R.string.enter_setup)
-                }
+                isUpdatingModuleToggles = true
+                binding.antiUninstallCardChip.isChecked = isAntiUninstallOn
+                isUpdatingModuleToggles = false
+                binding.antiUninstallWarning.visibility = View.GONE
 
                 if (doesAntiUninstallBlockView && isAntiUninstallOn) {
                     binding.apply {
@@ -500,11 +676,17 @@ class MainActivity : AppCompatActivity() {
                         startFocusMode.isEnabled = false
                     }
                 }
-                if (isAppBlockerOn) {
-                    val isFocusedModeOn = savedPreferencesLoader.getFocusModeData().isTurnedOn
-                    binding.selectFocusBlockedApps.isEnabled = !isFocusedModeOn
-                    binding.startFocusMode.isEnabled = !isFocusedModeOn
+                if (isAppBlockerServiceEnabled) {
+                    val isFocusedModeCurrentlyOn = savedPreferencesLoader.getFocusModeData().isTurnedOn
+                    binding.selectFocusBlockedApps.isEnabled = !isFocusedModeCurrentlyOn
+                    binding.startFocusMode.isEnabled = !isFocusedModeCurrentlyOn
                 }
+
+                lastAppBlockerEnabled = isAppBlockerServiceEnabled
+                lastViewBlockerEnabled = isViewBlockerServiceEnabled
+                lastKeywordBlockerEnabled = isKeywordBlockerServiceEnabled
+                lastUsageTrackerReady = usageTrackerReady
+                lastAntiUninstallEnabled = isAntiUninstallOn
 
             }
         }
@@ -514,16 +696,17 @@ class MainActivity : AppCompatActivity() {
         return sharedPreferences.getBoolean("isFirstLaunchComplete", false)
     }
 
-    private fun updateChip(isEnabled: Boolean,statusChip: Chip,warningText:TextView) {
-        if (isEnabled) {
-            statusChip.text = getString(R.string.enabled)
-            statusChip.chipIcon = null
-            warningText.visibility = View.GONE
-        } else {
-            statusChip.text = getString(R.string.disabled)
-            statusChip.setChipIconResource(R.drawable.baseline_warning_24)
-            warningText.visibility = View.VISIBLE
-        }
+    private fun updateModuleToggle(isEnabled: Boolean, toggle: CompoundButton, warningText: TextView) {
+        isUpdatingModuleToggles = true
+        toggle.isChecked = isEnabled
+        isUpdatingModuleToggles = false
+        warningText.visibility = View.GONE
+    }
+
+    private fun resetToggle(toggle: CompoundButton, checked: Boolean) {
+        isUpdatingModuleToggles = true
+        toggle.isChecked = checked
+        isUpdatingModuleToggles = false
     }
     private fun sendRefreshRequest(action: String) {
         val intent = Intent(action)

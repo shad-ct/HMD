@@ -3,99 +3,140 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="32dp">
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="16dp">
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/reel_stats_column_guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.52" />
 
     <com.github.mikephil.charting.charts.LineChart
         android:id="@+id/reels_stats"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="200dp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/textView4"
-        style="@style/TextAppearance.Material3.TitleLarge"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.TitleMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:text="Reel Stats"
+        app:layout_constraintEnd_toStartOf="@+id/reel_stats_column_guideline"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/reels_stats" />
 
     <TextView
         android:id="@+id/textView7"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="Scrolled Today: 6969"
+        app:layout_constraintEnd_toEndOf="@+id/textView4"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView4" />
 
     <TextView
         android:id="@+id/textView11"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="Total Scrolls:79k"
+        app:layout_constraintEnd_toEndOf="@+id/textView4"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView7" />
 
     <TextView
         android:id="@+id/textView12"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="Attention Span: 4.3 sec/reel"
+        app:layout_constraintEnd_toEndOf="@+id/textView4"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView11" />
 
     <TextView
         android:id="@+id/textView13"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="Days Tracked: 100"
+        app:layout_constraintEnd_toEndOf="@+id/textView4"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView12" />
 
     <TextView
         android:id="@+id/textView14"
-        style="@style/TextAppearance.Material3.TitleLarge"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.TitleMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:text="Top apps"
+        app:layout_constraintBaseline_toBaselineOf="@+id/textView4"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/reel_stats_column_guideline"
         app:layout_constraintTop_toBottomOf="@+id/reels_stats" />
 
     <TextView
         android:id="@+id/textView15"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="1. Instagram"
+        app:layout_constraintEnd_toEndOf="@+id/textView14"
         app:layout_constraintStart_toStartOf="@+id/textView14"
         app:layout_constraintTop_toBottomOf="@+id/textView14" />
 
     <TextView
         android:id="@+id/textView16"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="2. Chrome"
+        app:layout_constraintEnd_toEndOf="@+id/textView15"
         app:layout_constraintStart_toStartOf="@+id/textView15"
         app:layout_constraintTop_toBottomOf="@+id/textView15" />
 
     <TextView
         android:id="@+id/textView17"
-        android:layout_width="wrap_content"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="3. Browser"
+        app:layout_constraintEnd_toEndOf="@+id/textView16"
         app:layout_constraintStart_toStartOf="@+id/textView16"
         app:layout_constraintTop_toBottomOf="@+id/textView16" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/reel_stats_content_bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="textView13,textView17" />
 
     <TextView
         android:id="@+id/textView18"
         style="@style/MaterialAlertDialog.Material3.Body.Text"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="16dp"
         android:text="Tracked using KUC AppBlock"
+        android:textAlignment="center"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView17" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/reel_stats_content_bottom" />
 </androidx.constraintlayout.widget.ConstraintLayout>
