@@ -6,7 +6,6 @@ import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
 import android.app.admin.DevicePolicyManager
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -31,7 +30,6 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -52,7 +50,6 @@ import nethical.digipaws.services.UsageTrackingService
 import nethical.digipaws.services.ViewBlockerService
 import nethical.digipaws.ui.dialogs.StartFocusMode
 import nethical.digipaws.ui.dialogs.TweakAppBlockerWarning
-import nethical.digipaws.ui.dialogs.TweakGrayScaleMode
 import nethical.digipaws.ui.dialogs.TweakKeywordBlocker
 import nethical.digipaws.ui.dialogs.TweakKeywordPack
 import nethical.digipaws.ui.dialogs.TweakUsageTracker
@@ -63,12 +60,7 @@ import nethical.digipaws.ui.fragments.installation.AccessibilityGuide
 import nethical.digipaws.ui.fragments.installation.WelcomeFragment
 import nethical.digipaws.ui.fragments.usage.AllAppsUsageFragment
 import nethical.digipaws.utils.SavedPreferencesLoader
-import nethical.digipaws.utils.ZipUtils
-import rikka.shizuku.Shizuku
-import rikka.shizuku.Shizuku.OnBinderReceivedListener
 import java.io.File
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import java.util.Calendar
 
 
@@ -76,8 +68,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var selectPinnedAppsLauncher: ActivityResultLauncher<Intent>
-
-    private lateinit var selectGrayScaleApps: ActivityResultLauncher<Intent>
 
     private lateinit var selectBlockedAppsLauncher: ActivityResultLauncher<Intent>
 
@@ -91,9 +81,6 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var addAutoFocusHoursActivity: ActivityResultLauncher<Intent>
 
-    private lateinit var directoryPicker: ActivityResultLauncher<Intent>
-
-
     private val savedPreferencesLoader = SavedPreferencesLoader(this)
     private lateinit var options: ActivityOptionsCompat
     private var isDeviceAdminOn = false
@@ -101,14 +88,6 @@ class MainActivity : AppCompatActivity() {
 
     private var isGeneralSettingsOn = false
     private var isDisplayOverOtherAppsOn = false
-
-    private var isShizukuBinderRecieved = false
-    private val BINDER_RECEIVED_LISTENER = OnBinderReceivedListener {
-        if (!Shizuku.isPreV11()) {
-            isShizukuBinderRecieved = true
-            checkPermissions()
-        }
-    }
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -137,31 +116,19 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        // Listen for Shizuku permission results
-        Shizuku.addRequestPermissionResultListener { requestCode, resultCode ->
-            if (requestCode == 0 && resultCode == PackageManager.PERMISSION_GRANTED) {
-                checkPermissions()
-            }
-        }
-
         options = ActivityOptionsCompat.makeCustomAnimation(this, R.anim.fade_in, R.anim.fade_out)
         setupActivityLaunchers()
         setupClickListeners()
-
-        Shizuku.addBinderReceivedListenerSticky(BINDER_RECEIVED_LISTENER);
 
         if (!isFirstLaunchComplete()) {
             val intent = Intent(this, FragmentActivity::class.java)
             intent.putExtra("fragment", WelcomeFragment.FRAGMENT_ID)
             startActivity(intent, options.toBundle())
         }
-        showDonationDialog()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-
-        Shizuku.removeBinderReceivedListener(BINDER_RECEIVED_LISTENER);
     }
     override fun onResume() {
         super.onResume()
@@ -189,19 +156,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-
-
-        selectGrayScaleApps =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                if (result.resultCode == RESULT_OK) {
-                    val selectedApps = result.data?.getStringArrayListExtra("SELECTED_APPS")
-                    selectedApps?.let {
-                        savedPreferencesLoader.saveGrayScaleApps(it.toSet())
-                        sendRefreshRequest(GeneralFeaturesService.INTENT_ACTION_REFRESH_GRAYSCALE)
-                    }
-                }
-            }
-
 
 
         selectFocusModeUnblockedAppsLauncher =
@@ -244,15 +198,6 @@ class MainActivity : AppCompatActivity() {
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
                 sendRefreshRequest(AppBlockerService.INTENT_ACTION_REFRESH_FOCUS_MODE)
             }
-        // Register the directory picker
-        directoryPicker = ZipUtils.registerDirectoryPicker(this) { directoryUri ->
-            // Create the zip file in the selected directory
-            val filename = ZipUtils.createZipFileName()
-            val zipUri = createFileInDirectory(directoryUri, filename)
-            zipUri?.let {
-                ZipUtils.zipSharedPreferencesToUri(this, it)
-            }
-        }
     }
 
     private fun setupClickListeners() {
@@ -265,16 +210,6 @@ class MainActivity : AppCompatActivity() {
             )
 
             selectPinnedAppsLauncher.launch(intent, options)
-
-        }
-        binding.selectMonochromeApps.setOnClickListener {
-            val intent = Intent(this, SelectAppsActivity::class.java)
-            intent.putStringArrayListExtra(
-                "PRE_SELECTED_APPS",
-                ArrayList(savedPreferencesLoader.loadGrayScaleApps())
-            )
-
-            selectGrayScaleApps.launch(intent, options)
 
         }
         binding.selectBlockedApps.setOnClickListener {
@@ -413,32 +348,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.monochromeStatusChip.setOnClickListener {
-            if(!isGeneralSettingsOn){
-                makeAccessibilityInfoDialog("General Features", GeneralFeaturesService::class.java)
-                return@setOnClickListener
-            }
-            if(isShizukuBinderRecieved){
-                if( (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED)){
-                    Shizuku.requestPermission(0)
-                }
-            }else{
-                val packageManager = packageManager
-                try {
-                    // Check if Shizuku is installed
-                    packageManager.getPackageInfo(
-                        "moe.shizuku.privileged.api",
-                        PackageManager.GET_ACTIVITIES
-                    )
-                    Toast.makeText(this,"Failed! Make sure that shizuku is active",Toast.LENGTH_SHORT).show()
-                } catch (e: PackageManager.NameNotFoundException) {
-                    // Shizuku is not installed
-                    Log.d("Shizuku", "Shizuku is not installed on the device.")
-                    makeShizukuInfoDialog()
-                }
-            }
-        }
-
         binding.keywordBlockerStatusChip.setOnClickListener {
             makeAccessibilityInfoDialog("Keyword Blocker", KeywordBlockerService::class.java)
         }
@@ -459,59 +368,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        binding.setupMonochrome.setOnClickListener {
-            TweakGrayScaleMode(savedPreferencesLoader).show(
-                supportFragmentManager,
-                "tweak_monochrome"
-            )
-        }
-
-        // socials click listeners
-        binding.btnDiscord.setOnClickListener {
-            openUrl("https://discord.com/invite/Vs9mwUtuCN")
-        }
-
-        binding.btnTelegram.setOnClickListener {
-            openUrl("https://t.me/digipaws6")
-        }
-        binding.btnGithub.setOnClickListener {
-            openUrl("https://github.com/nethical6/digipaws")
-        }
-        binding.btnInstagram.setOnClickListener {
-            openUrl("https://www.instagram.com/digipaws.app")
-        }
-        binding.btnDonate.setOnClickListener {
-            openUrl("https://digipaws.life/donate")
-        }
-
-        binding.btnCredits.setOnClickListener {
-            openUrl("https://digipaws.life/credits")
-        }
-        binding.btnBackup.setOnClickListener {
-            ZipUtils.showDirectoryPicker(directoryPicker)
-        }
         binding.helpReelBlocker.setOnClickListener {
             MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.about_view_blocker))
                 .setMessage(getString(R.string.this_option_has_the_ability_to_block_youtube_shorts_and_instagram_reels_while_allowing_access_to_other_app_features))
                 .setPositiveButton(getString(R.string.ok), null)
                 .show()
-        }
-
-        binding.btnBackup.setOnClickListener {
-            ZipUtils.showDirectoryPicker(directoryPicker)
-        }
-        binding.btnShareErrors.setOnClickListener {
-            shareCrashLog(this)
-        }
-    }
-
-    private fun openUrl(url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        try {
-            startActivity(intent, options.toBundle())
-        } catch (e: ActivityNotFoundException) {
-            Toast.makeText(this, "No application found to open the link", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -644,70 +506,6 @@ class MainActivity : AppCompatActivity() {
                     binding.startFocusMode.isEnabled = !isFocusedModeOn
                 }
 
-                if(isGeneralSettingsOn){
-                    binding.monochromeWarning.text = "Authorize digipaws to access Shizuku"
-                    if(isShizukuBinderRecieved){
-                        setupShizukuFeatures()
-                    }
-                }else{
-                    binding.monochromeWarning.text = getString(R.string.warning_general_settings)
-                    binding.monochromeStatusChip.text = getString(R.string.disabled)
-                }
-
-            }
-        }
-    }
-
-
-    private fun setupShizukuFeatures(){
-        val isShizukuOn = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        updateChip(
-            isShizukuOn,
-            binding.monochromeStatusChip,
-            binding.monochromeWarning
-        )
-
-
-        binding.setupMonochrome.isEnabled = isShizukuOn
-        binding.selectMonochromeApps.isEnabled = isShizukuOn
-    }
-
-    private fun showDonationDialog() {
-        val sharedPreferences = getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
-        val firstDate = sharedPreferences.getString("first_date", null)
-        if (firstDate == null) {
-            // Store the current date as a string representation
-            val currentDateString = LocalDate.now().toString()
-            sharedPreferences.edit().putString("first_date", currentDateString).apply()
-        }
-
-        if (!(sharedPreferences.getBoolean("is_donation_alerted", false))) {
-            // Parse the stored date string back to LocalDate
-            val storedFirstDate = firstDate?.let { LocalDate.parse(it) } ?: LocalDate.now()
-            val daysPassed = ChronoUnit.DAYS.between(storedFirstDate, LocalDate.now())
-
-            Log.d("days passed", daysPassed.toString())
-            if (daysPassed > 5L) {
-                sharedPreferences.edit().putBoolean("is_donation_alerted", true).apply()
-                MaterialAlertDialogBuilder(this)
-                    .setTitle("Consider Donating?")
-                    .setMessage(
-                        "Hello, this is Nethical, the creator of digipaws. I'm a 17-year-old high school student with a passion for technology and computers. " +
-                                "A few months ago, I couldn't find any free app blocker solution that perfectly suited my needs, so I decided to build digipaws myself. " +
-                                "I have a strong vision for digipaws, including integrating gamification features. However, I may have to unfortunately halt this project due to a lack of funding. " +
-                                "If you find digipaws useful, please consider donating even a small amount to support its continued development. Thank you!"
-                    )
-                    .setNegativeButton("Close") { dialog, _ ->
-                        dialog.dismiss()
-
-
-                    }
-                    .setPositiveButton("Donate") { dialog, _ ->
-                        openUrl("https://digipaws.life/donate")
-                        dialog.dismiss()
-                    }
-                    .setCancelable(false)
-                    .show()
             }
         }
     }
@@ -716,23 +514,6 @@ class MainActivity : AppCompatActivity() {
         return sharedPreferences.getBoolean("isFirstLaunchComplete", false)
     }
 
-    fun shareCrashLog(context: Context) {
-        val logFile = File(context.filesDir, "crash_log.txt")
-        if (!logFile.exists()) {
-            Toast.makeText(context, "No crash logs found", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", logFile)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Crash Log")
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-
-        context.startActivity(Intent.createChooser(intent, "Share Crash Log"))
-    }
     private fun updateChip(isEnabled: Boolean,statusChip: Chip,warningText:TextView) {
         if (isEnabled) {
             statusChip.text = getString(R.string.enabled)
@@ -822,33 +603,6 @@ class MainActivity : AppCompatActivity() {
 
         }
     }
-
-    private fun makeShizukuInfoDialog() {
-        val permissionBinding =
-            DialogPermissionInfoBinding.inflate(layoutInflater)
-        permissionBinding.title.text = "Integrate Shizuku"
-
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setView(permissionBinding.root)
-            .show()
-
-        permissionBinding.btnAccept.text = "Download Shizuku"
-        permissionBinding.btnReject.text = "Cancel"
-        permissionBinding.desc.text =
-            "Shizuku is a powerful Android app that allows other apps to access system-level features securely without rooting your device. It acts as a bridge, enabling apps to perform advanced tasks by running commands with elevated permissions."
-
-        permissionBinding.point1.text = "control of the Daltonizer."
-        permissionBinding.point2.text = "Make your phone boring."
-        permissionBinding.point3.text = "Feels like using a 90s dumbphone"
-        permissionBinding.point4.visibility = View.GONE
-
-        permissionBinding.btnReject.setOnClickListener {
-            dialog.dismiss()
-        }
-        permissionBinding.btnAccept.setOnClickListener {
-            openUrl("https://shizuku.rikka.app/")
-        }
-            }
 
     private fun makeAccessibilityInfoDialog(title: String, cls: Class<*>) {
         val dialogAccessibilityServiceInfoBinding =
@@ -1030,16 +784,6 @@ class MainActivity : AppCompatActivity() {
         }
 
     }
-    private fun createFileInDirectory(directoryUri: Uri, filename: String): Uri? {
-        return try {
-            val docTree = DocumentFile.fromTreeUri(this, directoryUri)
-            docTree?.createFile("application/zip", filename)?.uri
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
     data class WarningData(
         val message: String = "",
         val timeInterval: Int = 120000, // default cooldown period

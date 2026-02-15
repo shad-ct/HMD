@@ -163,9 +163,6 @@
     <string name="discard_changes">Discard Changes?</string>
     <string name="are_you_sure_you_want_to_discard_all_changes_and_exit">Are you sure you want to discard all changes and exit?</string>
     <string name="yes">Yes</string>
-    <string name="join_discord">Join Discord</string>
-    <string name="follow_us_on_instagram">Follow us on Instagram</string>
-    <string name="support">Support</string>
     <string name="if_you_enable_this_you_won_t_be_able_to_change_configurations_such_as_adding_blocked_apps_keywords_and_more">If you enable this, you won\'t be able to change configurations such as adding blocked apps, keywords, and more until you remove anti-uninstall. Your existing changes will be used for the entire period.</string>
     <string name="alert">Alert!!</string>
     <string name="i_understand">I Understand</string>
@@ -177,7 +174,6 @@
     <string name="setup_auto_focus">Setup Auto-Focus</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
-    <string name="join_telegram">Join Telegram</string>
     <string name="guide">Guide</string>
     <string name="go_back">Go back</string>
 </resources>

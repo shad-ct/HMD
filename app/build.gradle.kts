@@ -85,10 +85,6 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
 
-    // Shizuku dependecies
-    implementation (libs.api)
-    implementation (libs.provider)
-
     implementation(libs.gson)
 
     testImplementation(libs.junit)

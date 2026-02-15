@@ -42,12 +42,17 @@ class SavedPreferencesLoader(private val context: Context) {
     }
 
 
-    fun saveBlockedApps(pinnedApps: Set<String>) {
+    fun saveBlockedApps(blockedApps: Set<String>) {
         val sharedPreferences =
             context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
-        sharedPreferences.edit().putStringSet("blocked_apps", pinnedApps).apply()
+        sharedPreferences.edit().putStringSet("blocked_apps", blockedApps).apply()
     }
 
+    fun saveBlockedKeywords(blockedKeywords: Set<String>) {
+        val sharedPreferences =
+            context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+        sharedPreferences.edit().putStringSet("blocked_keywords", blockedKeywords).apply()
+    }
 
     fun saveIgnoredAppUsageTracker(ignoredApps: Set<String>) {
         val sharedPreferences =
@@ -55,12 +60,6 @@ class SavedPreferencesLoader(private val context: Context) {
         sharedPreferences.edit().putStringSet("ignored_apps", ignoredApps).apply()
     }
 
-
-    fun saveBlockedKeywords(pinnedApps: Set<String>) {
-        val sharedPreferences =
-            context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
-        sharedPreferences.edit().putStringSet("blocked_keywords", pinnedApps).apply()
-    }
     fun saveAppBlockerCheatHoursList(cheatHoursList: MutableList<TimedActionActivity.AutoTimedActionItem>) {
         val sharedPreferences = context.getSharedPreferences("cheat_hours", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
@@ -308,18 +307,5 @@ class SavedPreferencesLoader(private val context: Context) {
         val sharedPreferences =
             context.getSharedPreferences("overlay_apps", Context.MODE_PRIVATE)
         return sharedPreferences.getStringSet("apps", emptySet()) ?: emptySet()
-    }
-
-
-    fun loadGrayScaleApps(): Set<String> {
-        val sharedPreferences =
-            context.getSharedPreferences("grayscale", Context.MODE_PRIVATE)
-        return sharedPreferences.getStringSet("apps", emptySet()) ?: emptySet()
-    }
-
-    fun saveGrayScaleApps(apps: Set<String>) {
-        val sharedPreferences =
-            context.getSharedPreferences("grayscale", Context.MODE_PRIVATE)
-        sharedPreferences.edit().putStringSet("apps", apps).apply()
     }
 }

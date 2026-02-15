@@ -160,9 +160,6 @@ Ativar isso desbloquearia o seguinte no HMD:\n1. Contar o número de reels/tikto
     <string name="discard_changes">Descartar alterações?</string>
     <string name="are_you_sure_you_want_to_discard_all_changes_and_exit">Tem certeza de que deseja descartar todas as alterações e sair?</string>
     <string name="yes">Sim</string>
-    <string name="join_discord">Entre no Discord</string>
-    <string name="follow_us_on_instagram">Siga-nos no Instagram</string>
-    <string name="support">Suporte</string>
     <string name="if_you_enable_this_you_won_t_be_able_to_change_configurations_such_as_adding_blocked_apps_keywords_and_more">Se você habilitar isso, não poderá alterar configurações como adicionar aplicativos bloqueados, palavras-chave e muito mais até remover o anti-uninstall. Suas alterações existentes serão usadas por todo o período.</string>
     <string name="alert">Alerta!!</string>
     <string name="i_understand">Eu entendo</string>
@@ -174,5 +171,4 @@ Ativar isso desbloquearia o seguinte no HMD:\n1. Contar o número de reels/tikto
     <string name="setup_auto_focus">Configurar foco automático</string>
     <!-- TODO: Remover ou alterar este texto de espaço reservado -->
     <string name="hello_blank_fragment">Olá, fragmento em branco</string>
-    <string name="join_telegram">Entrar no Telegram</string>
 </resources>
